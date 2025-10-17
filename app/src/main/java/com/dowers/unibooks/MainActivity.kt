@@ -20,6 +20,9 @@ import com.dowers.unibooks.ui.screens.LoginScreen
 import com.dowers.unibooks.ui.screens.DashboardScreen
 import com.dowers.unibooks.ui.screens.BooksScreen
 import com.dowers.unibooks.ui.screens.UsersScreen
+import com.dowers.unibooks.ui.screens.StudentDashboardScreen
+import com.dowers.unibooks.ui.screens.StudentBooksScreen
+import com.dowers.unibooks.ui.screens.StudentLoansScreen
 import com.dowers.unibooks.ui.theme.UnibooksTheme
 import com.dowers.unibooks.utils.UserInfo
 import retrofit2.Retrofit
@@ -104,7 +107,9 @@ fun AppContent(api: AuthApi) {
                             println("Mostrar perfil de: ${currentUser!!.name}")
                         },
                         onNavigateToHome = {
-                            navController.popBackStack()  // ⬅️ vuelve atrás a dashboard
+                            navController.navigate("dashboard") {
+                                popUpTo("dashboard") { inclusive = false }
+                            }
                         },
                         onNavigateToLoans = {
                             println("Navegar a préstamos")
@@ -127,7 +132,9 @@ fun AppContent(api: AuthApi) {
                             println("Mostrar perfil de: ${currentUser!!.name}")
                         },
                         onNavigateToHome = {
-                            navController.popBackStack()  // ⬅️ vuelve atrás a dashboard
+                            navController.navigate("dashboard") {
+                                popUpTo("dashboard") { inclusive = false }
+                            }
                         },
                         onNavigateToBooks = {
                             navController.navigate("books")
@@ -140,10 +147,71 @@ fun AppContent(api: AuthApi) {
             }
         }
         currentUser?.role == "estudiante" -> {
-            Text(
-                text = "Pantalla para estudiantes - ${currentUser!!.name}",
-                modifier = Modifier.padding(16.dp)
-            )
+            NavHost(
+                navController = navController,
+                startDestination = "student_dashboard"
+            ) {
+                composable("student_dashboard") {
+                    StudentDashboardScreen(
+                        userInfo = currentUser!!,
+                        onLogout = {
+                            currentUser = null
+                            navController.popBackStack("student_dashboard", inclusive = false)
+                        },
+                        onShowProfile = {
+                            println("Mostrar perfil de: ${currentUser!!.name}")
+                        },
+                        onNavigateToBooks = {
+                            navController.navigate("student_books")
+                        },
+                        onNavigateToLoans = {
+                            navController.navigate("student_loans")
+                        }
+                    )
+                }
+                composable("student_books") {
+                    StudentBooksScreen(
+                        userInfo = currentUser!!,
+                        api = api,
+                        accessToken = accessToken,
+                        onLogout = {
+                            currentUser = null
+                            navController.popBackStack("student_dashboard", inclusive = false)
+                        },
+                        onShowProfile = {
+                            println("Mostrar perfil de: ${currentUser!!.name}")
+                        },
+                        onNavigateToHome = {
+                            navController.navigate("student_dashboard") {
+                                popUpTo("student_dashboard") { inclusive = false }
+                            }
+                        },
+                        onNavigateToLoans = {
+                            navController.navigate("student_loans")
+                        }
+                    )
+                }
+                composable("student_loans") {
+                    StudentLoansScreen(
+                        userInfo = currentUser!!,
+                        onLogout = {
+                            currentUser = null
+                            navController.popBackStack("student_dashboard", inclusive = false)
+                        },
+                        onShowProfile = {
+                            println("Mostrar perfil de: ${currentUser!!.name}")
+                        },
+                        onNavigateToHome = {
+                            navController.navigate("student_dashboard") {
+                                popUpTo("student_dashboard") { inclusive = false }
+                            }
+                        },
+                        onNavigateToBooks = {
+                            navController.navigate("student_books")
+                        }
+                    )
+                }
+            }
         }
         else -> {
             LoginScreen(
