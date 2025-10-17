@@ -82,7 +82,7 @@ fun UsersScreen(
     val filteredUsers = remember(searchQuery, allUsers, userInfo.email) {
         // Primero excluir el usuario actual
         val usersWithoutCurrent = allUsers.filter { user ->
-            user.email != userInfo.email
+            user.id != userInfo.id
         }
         
         // Luego aplicar filtro de búsqueda
