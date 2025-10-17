@@ -12,10 +12,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.dowers.unibooks.data.remote.AuthApi
 import com.dowers.unibooks.ui.screens.LoginScreen
 import com.dowers.unibooks.ui.screens.DashboardScreen
 import com.dowers.unibooks.ui.screens.BooksScreen
+import com.dowers.unibooks.ui.screens.UsersScreen
 import com.dowers.unibooks.ui.theme.UnibooksTheme
 import com.dowers.unibooks.utils.UserInfo
 import retrofit2.Retrofit
@@ -57,66 +61,85 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppContent(api: AuthApi) {
     var currentUser by remember { mutableStateOf<UserInfo?>(null) }
-    var currentScreen by remember { mutableStateOf("dashboard") }
     var accessToken by remember { mutableStateOf("") }
-    
+    val navController = rememberNavController()
+
     when {
         currentUser?.role == "bibliotecario" -> {
-            when (currentScreen) {
-                "dashboard" -> {
+            NavHost(
+                navController = navController,
+                startDestination = "dashboard"
+            ) {
+                composable("dashboard") {
                     DashboardScreen(
                         userInfo = currentUser!!,
                         onLogout = {
                             currentUser = null
-                            currentScreen = "dashboard"
+                            navController.popBackStack("dashboard", inclusive = false)
                         },
                         onShowProfile = {
-                            // TODO: Implementar pantalla de perfil
                             println("Mostrar perfil de: ${currentUser!!.name}")
                         },
                         onNavigateToBooks = {
-                            currentScreen = "books"
+                            navController.navigate("books")
                         },
                         onNavigateToLoans = {
-                            // TODO: Implementar pantalla de préstamos
                             println("Navegar a préstamos")
                         },
                         onNavigateToUsers = {
-                            // TODO: Implementar pantalla de usuarios
-                            println("Navegar a usuarios")
+                            navController.navigate("users")
                         }
                     )
                 }
-                "books" -> {
+                composable("books") {
                     BooksScreen(
                         userInfo = currentUser!!,
                         api = api,
                         accessToken = accessToken,
                         onLogout = {
                             currentUser = null
-                            currentScreen = "dashboard"
+                            navController.popBackStack("dashboard", inclusive = false)
                         },
                         onShowProfile = {
-                            // TODO: Implementar pantalla de perfil
                             println("Mostrar perfil de: ${currentUser!!.name}")
                         },
                         onNavigateToHome = {
-                            currentScreen = "dashboard"
+                            navController.popBackStack()  // ⬅️ vuelve atrás a dashboard
                         },
                         onNavigateToLoans = {
-                            // TODO: Implementar pantalla de préstamos
                             println("Navegar a préstamos")
                         },
                         onNavigateToUsers = {
-                            // TODO: Implementar pantalla de usuarios
-                            println("Navegar a usuarios")
+                            navController.navigate("users")
+                        }
+                    )
+                }
+                composable("users") {
+                    UsersScreen(
+                        userInfo = currentUser!!,
+                        api = api,
+                        accessToken = accessToken,
+                        onLogout = {
+                            currentUser = null
+                            navController.popBackStack("dashboard", inclusive = false)
+                        },
+                        onShowProfile = {
+                            println("Mostrar perfil de: ${currentUser!!.name}")
+                        },
+                        onNavigateToHome = {
+                            navController.popBackStack()  // ⬅️ vuelve atrás a dashboard
+                        },
+                        onNavigateToBooks = {
+                            navController.navigate("books")
+                        },
+                        onNavigateToLoans = {
+                            println("Navegar a préstamos")
                         }
                     )
                 }
             }
         }
         currentUser?.role == "estudiante" -> {
-            // TODO: Implementar pantalla para estudiantes
             Text(
                 text = "Pantalla para estudiantes - ${currentUser!!.name}",
                 modifier = Modifier.padding(16.dp)
@@ -128,7 +151,6 @@ fun AppContent(api: AuthApi) {
                 onLibrarianLogin = { userInfo, token ->
                     currentUser = userInfo
                     accessToken = token
-                    currentScreen = "dashboard"
                 },
                 onStudentLogin = { userInfo, token ->
                     currentUser = userInfo

@@ -21,16 +21,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.dowers.unibooks.data.models.Book
+import com.dowers.unibooks.data.models.User
 import com.dowers.unibooks.data.remote.AuthApi
-import com.dowers.unibooks.data.remote.CreateBookRequest
+import com.dowers.unibooks.data.remote.CreateUserRequest
 import com.dowers.unibooks.utils.UserInfo
 import kotlinx.coroutines.launch
 import android.util.Log
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BooksScreen(
+fun UsersScreen(
     userInfo: UserInfo,
     api: AuthApi,
     accessToken: String,
@@ -38,57 +39,65 @@ fun BooksScreen(
     onShowProfile: () -> Unit,
     onNavigateToHome: () -> Unit,
     onNavigateToLoans: () -> Unit,
-    onNavigateToUsers: () -> Unit
+    onNavigateToBooks: () -> Unit
 ) {
     var showUserMenu by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var showCreateBookModal by remember { mutableStateOf(false) }
-    var showEditBookModal by remember { mutableStateOf(false) }
-    var selectedBook by remember { mutableStateOf<Book?>(null) }
-    var allBooks by remember { mutableStateOf<List<Book>>(emptyList()) }
-    var isLoadingBooks by remember { mutableStateOf(true) }
+    var showCreateUserModal by remember { mutableStateOf(false) }
+    var showEditUserModal by remember { mutableStateOf(false) }
+    var selectedUser by remember { mutableStateOf<User?>(null) }
+    var allUsers by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isLoadingUsers by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     
-    // Cargar libros del servidor
+    // Cargar usuarios del servidor
     LaunchedEffect(accessToken) {
         if (accessToken.isNotEmpty()) {
             try {
-                Log.d("GET_BOOKS", "Obteniendo libros del servidor")
-                isLoadingBooks = true
+                Log.d("GET_USERS", "Obteniendo usuarios del servidor")
+                isLoadingUsers = true
                 errorMessage = null
                 
-                val response = api.getBooks("Bearer $accessToken")
+                val response = api.getUsers("Bearer $accessToken")
                 
                 if (response.isSuccessful) {
-                    allBooks = response.body() ?: emptyList()
-                    Log.d("GET_BOOKS", "Libros obtenidos: ${allBooks.size}")
-                    Log.d("GET_BOOKS", "Primer libro: ${if (allBooks.isNotEmpty()) allBooks[0] else "Lista vacía"}")
+                    allUsers = response.body() ?: emptyList()
+                    Log.d("GET_USERS", "Usuarios obtenidos: ${allUsers.size}")
+                    Log.d("GET_USERS", "Primer usuario: ${if (allUsers.isNotEmpty()) allUsers[0] else "Lista vacía"}")
                 } else {
-                    Log.e("GET_BOOKS", "Error obteniendo libros: ${response.code()}")
-                    errorMessage = "Error cargando libros: ${response.code()}"
+                    Log.e("GET_USERS", "Error obteniendo usuarios: ${response.code()}")
+                    errorMessage = "Error cargando usuarios: ${response.code()}"
                 }
             } catch (e: Exception) {
-                Log.e("GET_BOOKS", "Excepción obteniendo libros: ${e.message}", e)
+                Log.e("GET_USERS", "Excepción obteniendo usuarios: ${e.message}", e)
                 errorMessage = "Error de conexión: ${e.message}"
             } finally {
-                isLoadingBooks = false
+                isLoadingUsers = false
             }
         }
     }
     
-    // Filtrar libros según la búsqueda
-    val filteredBooks = remember(searchQuery, allBooks) {
+    // Filtrar usuarios según la búsqueda y excluir el usuario actual
+    val filteredUsers = remember(searchQuery, allUsers, userInfo.email) {
+        // Primero excluir el usuario actual
+        val usersWithoutCurrent = allUsers.filter { user ->
+            user.email != userInfo.email
+        }
+        
+        // Luego aplicar filtro de búsqueda
         val filtered = if (searchQuery.isEmpty()) {
-            allBooks
+            usersWithoutCurrent
         } else {
-            allBooks.filter { book ->
-                book.titulo.contains(searchQuery, ignoreCase = true) ||
-                book.escritor.contains(searchQuery, ignoreCase = true)
+            usersWithoutCurrent.filter { user ->
+                user.firstName.contains(searchQuery, ignoreCase = true) ||
+                user.lastName.contains(searchQuery, ignoreCase = true) ||
+                user.email.contains(searchQuery, ignoreCase = true) ||
+                user.cedula.contains(searchQuery, ignoreCase = true)
             }
         }
-        Log.d("FILTER_BOOKS", "allBooks size: ${allBooks.size}, filteredBooks size: ${filtered.size}")
-        Log.d("FILTER_BOOKS", "isLoadingBooks: $isLoadingBooks, errorMessage: $errorMessage")
+        Log.d("FILTER_USERS", "allUsers size: ${allUsers.size}, usersWithoutCurrent: ${usersWithoutCurrent.size}, filteredUsers size: ${filtered.size}")
+        Log.d("FILTER_USERS", "isLoadingUsers: $isLoadingUsers, errorMessage: $errorMessage")
         filtered
     }
 
@@ -120,7 +129,7 @@ fun BooksScreen(
             ) {
                 Column {
                     Text(
-                        text = "Biblioteca",
+                        text = "Usuarios",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -187,7 +196,7 @@ fun BooksScreen(
 
         // Título de la sección
         Text(
-            text = "📚 Catálogo de Libros",
+            text = "👥 Gestión de Usuarios",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -197,7 +206,7 @@ fun BooksScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            label = { Text("Buscar por título o escritor") },
+            label = { Text("Buscar por nombre, email o cédula") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -222,7 +231,7 @@ fun BooksScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-                // Lista de libros
+                // Lista de usuarios
                 Box(
                     modifier = Modifier.weight(1f)
                 ) {
@@ -232,9 +241,9 @@ fun BooksScreen(
                             .fillMaxSize()
                             .padding(bottom = 150.dp) // Padding para evitar solapamiento con navegación
                     ) {
-                    Log.d("LAZY_COLUMN", "Renderizando LazyColumn - isLoadingBooks: $isLoadingBooks, errorMessage: $errorMessage, filteredBooks: ${filteredBooks.size}")
+                    Log.d("LAZY_COLUMN", "Renderizando LazyColumn - isLoadingUsers: $isLoadingUsers, errorMessage: $errorMessage, filteredUsers: ${filteredUsers.size}")
                     
-                    if (isLoadingBooks) {
+                    if (isLoadingUsers) {
                         item {
                             Box(
                                 modifier = Modifier.fillMaxWidth(),
@@ -245,7 +254,7 @@ fun BooksScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     CircularProgressIndicator()
-                                    Text("Cargando libros...")
+                                    Text("Cargando usuarios...")
                                 }
                             }
                         }
@@ -275,21 +284,21 @@ fun BooksScreen(
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = {
-                                            // Recargar libros
+                                            // Recargar usuarios
                                             scope.launch {
                                                 try {
-                                                    isLoadingBooks = true
+                                                    isLoadingUsers = true
                                                     errorMessage = null
-                                                    val response = api.getBooks("Bearer $accessToken")
+                                                    val response = api.getUsers("Bearer $accessToken")
                                                     if (response.isSuccessful) {
-                                                        allBooks = response.body() ?: emptyList()
+                                                        allUsers = response.body() ?: emptyList()
                                                     } else {
-                                                        errorMessage = "Error cargando libros: ${response.code()}"
+                                                        errorMessage = "Error cargando usuarios: ${response.code()}"
                                                     }
                                                 } catch (e: Exception) {
                                                     errorMessage = "Error de conexión: ${e.message}"
                                                 } finally {
-                                                    isLoadingBooks = false
+                                                    isLoadingUsers = false
                                                 }
                                             }
                                         }
@@ -299,7 +308,7 @@ fun BooksScreen(
                                 }
                             }
                         }
-                    } else if (filteredBooks.isEmpty()) {
+                    } else if (filteredUsers.isEmpty()) {
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -313,12 +322,12 @@ fun BooksScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Info,
-                                        contentDescription = "Sin libros",
+                                        contentDescription = "Sin usuarios",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = if (searchQuery.isEmpty()) "No hay libros disponibles" else "No se encontraron libros",
+                                        text = if (searchQuery.isEmpty()) "No hay usuarios disponibles" else "No se encontraron usuarios",
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
@@ -326,39 +335,39 @@ fun BooksScreen(
                             }
                         }
                     } else {
-                        Log.d("LAZY_COLUMN", "Renderizando ${filteredBooks.size} libros")
-                        items(filteredBooks) { book ->
-                            Log.d("LAZY_COLUMN", "Renderizando item para libro: ${book.titulo}")
-                            BookCard(
-                                book = book,
+                        Log.d("LAZY_COLUMN", "Renderizando ${filteredUsers.size} usuarios")
+                        items(filteredUsers) { user ->
+                            Log.d("LAZY_COLUMN", "Renderizando item para usuario: ${user.firstName}")
+                            UserCard(
+                                user = user,
                                 onClick = {
-                                    selectedBook = book
-                                    showEditBookModal = true
+                                    selectedUser = user
+                                    showEditUserModal = true
                                 },
-                                onDelete = { bookToDelete ->
+                                onDelete = { userToDelete ->
                                     scope.launch {
                                         try {
-                                            Log.d("DELETE_BOOK", "Eliminando libro ${bookToDelete.id}: ${bookToDelete.titulo}")
-                                            val response = api.deleteBook("Bearer $accessToken", bookToDelete.id)
+                                            Log.d("DELETE_USER", "Eliminando usuario ${userToDelete.id}: ${userToDelete.firstName}")
+                                            val response = api.deleteUser("Bearer $accessToken", userToDelete.id)
 
                                             if (response.isSuccessful) {
-                                                Log.d("DELETE_BOOK", "Libro eliminado exitosamente")
+                                                Log.d("DELETE_USER", "Usuario eliminado exitosamente")
                                                 
-                                                // Recargar la lista de libros
+                                                // Recargar la lista de usuarios
                                                 try {
-                                                    val booksResponse = api.getBooks("Bearer $accessToken")
-                                                    if (booksResponse.isSuccessful) {
-                                                        allBooks = booksResponse.body() ?: emptyList()
-                                                        Log.d("DELETE_BOOK", "Lista de libros actualizada: ${allBooks.size}")
+                                                    val usersResponse = api.getUsers("Bearer $accessToken")
+                                                    if (usersResponse.isSuccessful) {
+                                                        allUsers = usersResponse.body() ?: emptyList()
+                                                        Log.d("DELETE_USER", "Lista de usuarios actualizada: ${allUsers.size}")
                                                     }
                                                 } catch (e: Exception) {
-                                                    Log.e("DELETE_BOOK", "Error recargando libros: ${e.message}")
+                                                    Log.e("DELETE_USER", "Error recargando usuarios: ${e.message}")
                                                 }
                                             } else {
-                                                Log.e("DELETE_BOOK", "Error eliminando libro: ${response.code()}")
+                                                Log.e("DELETE_USER", "Error eliminando usuario: ${response.code()}")
                                             }
                                         } catch (e: Exception) {
-                                            Log.e("DELETE_BOOK", "Excepción eliminando libro: ${e.message}", e)
+                                            Log.e("DELETE_USER", "Excepción eliminando usuario: ${e.message}", e)
                                         }
                                     }
                                 }
@@ -370,9 +379,9 @@ fun BooksScreen(
 
         }
 
-        // FloatingActionButton para crear libro
+        // FloatingActionButton para crear usuario
         FloatingActionButton(
-            onClick = { showCreateBookModal = true },
+            onClick = { showCreateUserModal = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp, 0.dp, 16.dp, 150.dp), // Padding inferior para evitar solapamiento con navegación
@@ -380,7 +389,7 @@ fun BooksScreen(
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Crear libro",
+                contentDescription = "Crear usuario",
                 tint = MaterialTheme.colorScheme.onPrimary
             )
         }
@@ -418,104 +427,165 @@ fun BooksScreen(
                 NavigationButton(
                     icon = Icons.Default.Settings,
                     label = "Libros",
-                    isSelected = true,
-                    onClick = { /* Ya estamos aquí */ }
+                    isSelected = false,
+                    onClick = onNavigateToBooks
                 )
                 NavigationButton(
                     icon = Icons.Default.Person,
                     label = "Usuarios",
-                    isSelected = false,
-                    onClick = onNavigateToUsers
+                    isSelected = true,
+                    onClick = { /* Ya estamos aquí */ }
                 )
             }
         }
     }
 
-        // Modal para crear libro
-        if (showCreateBookModal) {
-        CreateBookModal(
-            onDismiss = { showCreateBookModal = false },
-                    onCreateBook = { bookRequest ->
-                        scope.launch {
-                            try {
-                                Log.d("CREATE_BOOK", "Creando libro: $bookRequest")
-                                val response = api.createBook("Bearer $accessToken", bookRequest)
-
-                                if (response.isSuccessful) {
-                                    Log.d("CREATE_BOOK", "Libro creado exitosamente: ${response.body()}")
-                                    showCreateBookModal = false
-                                    
-                                    // Recargar la lista de libros
-                                    try {
-                                        val booksResponse = api.getBooks("Bearer $accessToken")
-                                        if (booksResponse.isSuccessful) {
-                                            allBooks = booksResponse.body() ?: emptyList()
-                                            Log.d("CREATE_BOOK", "Lista de libros actualizada: ${allBooks.size}")
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("CREATE_BOOK", "Error recargando libros: ${e.message}")
-                                    }
-                                } else {
-                                    Log.e("CREATE_BOOK", "Error creando libro: ${response.code()}")
-                                }
-                            } catch (e: Exception) {
-                                Log.e("CREATE_BOOK", "Excepción creando libro: ${e.message}", e)
-                            }
-                        }
-                    }
+        // Modal para crear usuario
+        if (showCreateUserModal) {
+        CreateUserModal(
+            onDismiss = { showCreateUserModal = false },
+            onCreateUser = { userRequest, onError ->
+              scope.launch {
+                  try {
+                      Log.d("CREATE_USER", "Creando usuario: $userRequest")
+          
+                      val response = api.createUser("Bearer $accessToken", userRequest)
+          
+                      if (response.isSuccessful) {
+                          Log.d("CREATE_USER", "Usuario creado exitosamente: ${response.body()}")
+          
+                          // Cerrar modal de creación
+                          showCreateUserModal = false
+          
+                          // Recargar lista de usuarios
+                          try {
+                              val usersResponse = api.getUsers("Bearer $accessToken")
+                              if (usersResponse.isSuccessful) {
+                                  allUsers = usersResponse.body() ?: emptyList()
+                                  Log.d("CREATE_USER", "Lista de usuarios actualizada: ${allUsers.size}")
+                              } else {
+                                  Log.e("CREATE_USER", "Error al recargar usuarios: ${usersResponse.code()}")
+                                  onError("No se pudo recargar la lista de usuarios.")
+                              }
+                          } catch (e: Exception) {
+                              Log.e("CREATE_USER", "Excepción recargando usuarios: ${e.message}", e)
+                              onError("Error recargando usuarios: ${e.message}")
+                          }
+          
+                      } else {
+                          Log.e("CREATE_USER", "Error creando usuario: ${response.code()}")
+          
+                          // Intentar extraer mensaje desde el cuerpo del error
+                          val errorMessage = try {
+                              val rawError = response.errorBody()?.string()
+                              Log.e("CREATE_USER", "Error body: $rawError")
+          
+                              if (!rawError.isNullOrEmpty()) {
+                                  val json = JSONObject(rawError)
+                                  json.optString(
+                                      "message",
+                                      "Ocurrió un error al crear el usuario. Por favor, intenta nuevamente."
+                                  )
+                              } else {
+                                  "Error desconocido al crear el usuario."
+                              }
+                          } catch (e: Exception) {
+                              Log.e("CREATE_USER", "Error procesando errorBody: ${e.message}")
+                              "Ocurrió un error inesperado al procesar la respuesta."
+                          }
+          
+                          // Mostrar mensaje al usuario
+                          onError(errorMessage)
+                      }
+          
+                  } catch (e: Exception) {
+                      Log.e("CREATE_USER", "Excepción creando usuario: ${e.message}", e)
+                      onError("Error de conexión: ${e.message}")
+                  }
+              }
+            } 
         )
     }
 
-        // Modal para editar libro
-        if (showEditBookModal && selectedBook != null) {
-            EditBookModal(
-                book = selectedBook!!,
+        // Modal para editar usuario
+        if (showEditUserModal && selectedUser != null) {
+            EditUserModal(
+                user = selectedUser!!,
                 onDismiss = { 
-                    showEditBookModal = false
-                    selectedBook = null
+                    showEditUserModal = false
+                    selectedUser = null
                 },
-                onUpdateBook = { bookId, bookRequest ->
-                    scope.launch {
-                        try {
-                            Log.d("UPDATE_BOOK", "Actualizando libro $bookId: $bookRequest")
-                            val response = api.updateBook("Bearer $accessToken", bookId, bookRequest)
-
-                            if (response.isSuccessful) {
-                                Log.d("UPDATE_BOOK", "Libro actualizado exitosamente: ${response.body()}")
-                                showEditBookModal = false
-                                selectedBook = null
-                                
-                                // Recargar la lista de libros
-                                try {
-                                    val booksResponse = api.getBooks("Bearer $accessToken")
-                                    if (booksResponse.isSuccessful) {
-                                        allBooks = booksResponse.body() ?: emptyList()
-                                        Log.d("UPDATE_BOOK", "Lista de libros actualizada: ${allBooks.size}")
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("UPDATE_BOOK", "Error recargando libros: ${e.message}")
-                                }
-                            } else {
-                                Log.e("UPDATE_BOOK", "Error actualizando libro: ${response.code()}")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("UPDATE_BOOK", "Excepción actualizando libro: ${e.message}", e)
-                        }
-                    }
-                }
+                onUpdateUser = { userId, userRequest, onError ->
+                  scope.launch {
+                      try {
+                          Log.d("UPDATE_USER", "Actualizando usuario $userId: $userRequest")
+              
+                          val response = api.updateUser("Bearer $accessToken", userId, userRequest)
+              
+                          if (response.isSuccessful) {
+                              Log.d("UPDATE_USER", "Usuario actualizado exitosamente: ${response.body()}")
+              
+                              // Cerrar el modal y limpiar selección
+                              showEditUserModal = false
+                              selectedUser = null
+              
+                              // Recargar lista de usuarios
+                              try {
+                                  val usersResponse = api.getUsers("Bearer $accessToken")
+                                  if (usersResponse.isSuccessful) {
+                                      allUsers = usersResponse.body() ?: emptyList()
+                                      Log.d("UPDATE_USER", "Lista de usuarios actualizada: ${allUsers.size}")
+                                  } else {
+                                      Log.e("UPDATE_USER", "Error al recargar usuarios: ${usersResponse.code()}")
+                                      onError("No se pudo recargar la lista de usuarios.")
+                                  }
+                              } catch (e: Exception) {
+                                  Log.e("UPDATE_USER", "Excepción recargando usuarios: ${e.message}", e)
+                                  onError("Error recargando usuarios: ${e.message}")
+                              }
+              
+                          } else {
+                              Log.e("UPDATE_USER", "Error actualizando usuario: ${response.code()}")
+              
+                              // Intentar obtener mensaje desde el cuerpo del error
+                              val errorMessage = try {
+                                  val rawError = response.errorBody()?.string()
+                                  Log.e("UPDATE_USER", "Error body: $rawError")
+              
+                                  if (!rawError.isNullOrEmpty()) {
+                                      val json = JSONObject(rawError)
+                                      json.optString("message", "Error desconocido al actualizar el usuario.")
+                                  } else {
+                                      "Error desconocido al actualizar el usuario."
+                                  }
+                              } catch (e: Exception) {
+                                  Log.e("UPDATE_USER", "Error procesando errorBody: ${e.message}")
+                                  "Ocurrió un error inesperado al procesar la respuesta."
+                              }
+              
+                              // Mostrar mensaje al usuario
+                              onError(errorMessage)
+                          }
+              
+                      } catch (e: Exception) {
+                          Log.e("UPDATE_USER", "Excepción actualizando usuario: ${e.message}", e)
+                          onError("Error de conexión: ${e.message}")
+                      }
+                  }
+              }              
             )
         }
 }
 
 @Composable
-fun BookCard(
-    book: Book,
+fun UserCard(
+    user: User,
     onClick: () -> Unit,
-    onDelete: (Book) -> Unit
+    onDelete: (User) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     
-    Log.d("BOOK_CARD", "Renderizando BookCard para: ${book.titulo}")
+    Log.d("USER_CARD", "Renderizando UserCard para: ${user.firstName}")
     
     Card(
         modifier = Modifier
@@ -530,14 +600,14 @@ fun BookCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Título, stock y botón eliminar
+            // Nombre completo y botón eliminar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    text = book.titulo,
+                    text = "${user.firstName} ${user.secondName} ${user.lastName} ${user.secondLastName}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -549,27 +619,31 @@ fun BookCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Indicador de stock
+                    // Indicador de rol
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = when {
-                                book.stock == 0 -> MaterialTheme.colorScheme.errorContainer
-                                book.stock <= 2 -> MaterialTheme.colorScheme.tertiaryContainer
-                                else -> MaterialTheme.colorScheme.primaryContainer
+                            containerColor = when (user.role) {
+                                "bibliotecario" -> MaterialTheme.colorScheme.primaryContainer
+                                "estudiante" -> MaterialTheme.colorScheme.secondaryContainer
+                                else -> MaterialTheme.colorScheme.tertiaryContainer
                             }
                         ),
                         modifier = Modifier.clip(RoundedCornerShape(8.dp))
                     ) {
                         Text(
-                            text = "📚 ${book.stock}",
+                        text = when (user.role) {
+                            "bibliotecario" -> "📚 Bibliotecario"
+                            "estudiante" -> "👤 Estudiante"
+                            else -> "❓ ${user.role}"
+                        },
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = when {
-                                book.stock == 0 -> MaterialTheme.colorScheme.onErrorContainer
-                                book.stock <= 2 -> MaterialTheme.colorScheme.onTertiaryContainer
-                                else -> MaterialTheme.colorScheme.onPrimaryContainer
-                            }
+                        color = when (user.role) {
+                            "bibliotecario" -> MaterialTheme.colorScheme.onPrimaryContainer
+                            "estudiante" -> MaterialTheme.colorScheme.onSecondaryContainer
+                            else -> MaterialTheme.colorScheme.onTertiaryContainer
+                        }
                         )
                     }
                     
@@ -580,7 +654,7 @@ fun BookCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Eliminar libro",
+                            contentDescription = "Eliminar usuario",
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
@@ -590,19 +664,19 @@ fun BookCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Escritor
+            // Email
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Escritor",
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Email",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = book.escritor,
+                    text = user.email,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -611,34 +685,21 @@ fun BookCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Ubicación
+            // Cédula
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = "Ubicación",
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Cédula",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = book.ubicacion,
+                    text = user.cedula,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Descripción
-            if (book.descripcion.isNotEmpty()) {
-                Text(
-                    text = book.descripcion,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -650,14 +711,14 @@ fun BookCard(
             onDismissRequest = { showDeleteDialog = false },
             title = {
                 Text(
-                    text = "Eliminar libro",
+                    text = "Eliminar usuario",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = "¿Estás seguro de que quieres eliminar el libro \"${book.titulo}\"? Esta acción no se puede deshacer.",
+                    text = "¿Estás seguro de que quieres eliminar al usuario \"${user.firstName} ${user.lastName}\"? Esta acción no se puede deshacer.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -665,7 +726,7 @@ fun BookCard(
                 Button(
                     onClick = {
                         showDeleteDialog = false
-                        onDelete(book)
+                        onDelete(user)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -684,4 +745,3 @@ fun BookCard(
         )
     }
 }
-
