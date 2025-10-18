@@ -160,7 +160,10 @@ fun DashboardScreen(
             text = "Préstamos Recientes",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 20.dp, top = 20.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp, top = 20.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         
         // Mostrar mensaje de error si existe

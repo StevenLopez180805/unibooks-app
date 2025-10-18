@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -175,7 +176,7 @@ fun BooksScreen(
                                 onLogout()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.ExitToApp, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                             }
                         )
                     }
@@ -308,7 +309,9 @@ fun BooksScreen(
                                 )
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(16.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Icon(
@@ -319,6 +322,7 @@ fun BooksScreen(
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = if (searchQuery.isEmpty()) "No hay libros disponibles" else "No se encontraron libros",
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )

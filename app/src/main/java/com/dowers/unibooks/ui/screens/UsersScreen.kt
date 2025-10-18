@@ -317,7 +317,9 @@ fun UsersScreen(
                                 )
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(16.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Icon(
@@ -328,6 +330,7 @@ fun UsersScreen(
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = if (searchQuery.isEmpty()) "No hay usuarios disponibles" else "No se encontraron usuarios",
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
