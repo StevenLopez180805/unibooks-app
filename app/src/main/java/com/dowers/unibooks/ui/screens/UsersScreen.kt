@@ -206,7 +206,7 @@ fun UsersScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            label = { Text("Buscar por nombre, email o cédula") },
+            label = { Text("Buscar por nombre o cédula") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,

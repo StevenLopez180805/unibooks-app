@@ -9,6 +9,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.Path
 import com.dowers.unibooks.data.models.Book
 import com.dowers.unibooks.data.models.User
+import retrofit2.http.Query
 
 data class LoginRequest(
     val email: String,
@@ -36,6 +37,31 @@ data class CreateUserRequest(
     val email: String,
     val password: String,
     val role: String = "estudiante"
+)
+
+data class CreatePrestamoRequest(
+    val fechaPrestamo: String,
+    val fechaDevolucionEsperada: String,
+    val fechaDevolucion: String? = null,
+    val user: UserRef,
+    val libro: List<LibroRef>
+)
+
+data class UserRef(
+    val id: Int
+)
+
+data class LibroRef(
+    val id: Int
+)
+
+data class PrestamoResponse(
+    val id: Int,
+    val fechaPrestamo: String,
+    val fechaDevolucionEsperada: String,
+    val fechaDevolucion: String?,
+    val user: User,
+    val libro: List<Book>
 )
 
 data class ErrorResponse(
@@ -94,6 +120,37 @@ interface AuthApi {
     
     @DELETE("users/{id}")
     suspend fun deleteUser(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<Unit>
+    
+    // Endpoints para préstamos
+    @GET("prestamos")
+    suspend fun getPrestamos(
+        @Header("Authorization") token: String
+    ): Response<List<PrestamoResponse>>
+    
+    @GET("prestamos")
+    suspend fun getPrestamosByUserId(
+        @Header("Authorization") token: String,
+        @Query("userId") userId: Int,
+        @Query("limit") limit: Int? = null
+    ): Response<List<PrestamoResponse>>
+    
+    @POST("prestamos")
+    suspend fun createPrestamo(
+        @Header("Authorization") token: String,
+        @Body request: CreatePrestamoRequest
+    ): Response<Unit>
+    
+    @PATCH("prestamos/{id}/devolver")
+    suspend fun devolverPrestamo(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<Unit>
+    
+    @DELETE("prestamos/{id}")
+    suspend fun deletePrestamo(
         @Header("Authorization") token: String,
         @Path("id") id: Int
     ): Response<Unit>

@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,20 +19,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dowers.unibooks.utils.UserInfo
-
-data class Prestamo(
-    val id: String,
-    val libro: String,
-    val estudiante: String,
-    val fechaPrestamo: String,
-    val fechaDevolucion: String,
-    val estado: String
-)
+import com.dowers.unibooks.data.remote.AuthApi
+import com.dowers.unibooks.data.remote.PrestamoResponse
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     userInfo: UserInfo,
+    api: AuthApi,
+    accessToken: String,
     onLogout: () -> Unit,
     onShowProfile: () -> Unit,
     onNavigateToBooks: () -> Unit = {},
@@ -39,15 +38,31 @@ fun DashboardScreen(
     onNavigateToUsers: () -> Unit = {}
 ) {
     var showUserMenu by remember { mutableStateOf(false) }
+    var prestamos by remember { mutableStateOf<List<PrestamoResponse>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     
-    // Datos de ejemplo para los préstamos
-    val prestamos = remember {
-        listOf(
-            Prestamo("1", "El Quijote", "Juan Pérez", "2024-01-15", "2024-01-22", "Prestado"),
-            Prestamo("2", "Cien años de soledad", "María García", "2024-01-14", "2024-01-21", "Prestado"),
-            Prestamo("3", "1984", "Carlos López", "2024-01-13", "2024-01-20", "Devuelto"),
-            Prestamo("4", "Don Juan Tenorio", "Ana Martínez", "2024-01-12", "2024-01-19", "Prestado")
-        )
+    // Cargar préstamos del servidor
+    LaunchedEffect(accessToken) {
+        try {
+            isLoading = true
+            errorMessage = null
+            
+            val response = api.getPrestamos(
+                token = "Bearer $accessToken"
+            )
+            
+            if (response.isSuccessful) {
+                prestamos = response.body()?.take(10) ?: emptyList() // Tomar solo los primeros 10
+            } else {
+                errorMessage = "Error al cargar préstamos: ${response.code()}"
+            }
+        } catch (e: Exception) {
+            errorMessage = "Error de conexión: ${e.message}"
+        } finally {
+            isLoading = false
+        }
     }
 
     Column(
@@ -130,7 +145,7 @@ fun DashboardScreen(
                                 onLogout()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.ExitToApp, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                             }
                         )
                     }
@@ -138,129 +153,107 @@ fun DashboardScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Título de la sección
         Text(
             text = "Préstamos Recientes",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(bottom = 20.dp, top = 20.dp)
         )
+        
+        // Mostrar mensaje de error si existe
+        errorMessage?.let { error ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Text(
+                    text = error,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        
+        // Mostrar indicador de carga
+        if (isLoading) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Cargando préstamos...",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
 
-        // Tabla de préstamos
+        // Cards de préstamos
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(7f)
                 .clip(RoundedCornerShape(16.dp)),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )
         ) {
-            Column {
-                // Header de la tabla
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "📚 Últimos 10 Préstamos",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                if (prestamos.isEmpty() && !isLoading) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "📚 Libro",
+                    ) {
+                        Text(
+                            text = "No hay préstamos registrados",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
                         modifier = Modifier.weight(1f),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "👤 Estudiante",
-                        modifier = Modifier.weight(1f),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "📊 Estado",
-                        modifier = Modifier.weight(0.7f),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "📅 Fecha",
-                        modifier = Modifier.weight(0.8f),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-
-                // Contenido de la tabla
-                LazyColumn {
-                    items(prestamos) { prestamo ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (prestamos.indexOf(prestamo) % 2 == 0) {
-                                    MaterialTheme.colorScheme.surface
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                }
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = prestamo.libro,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = prestamo.estudiante,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Card(
-                                    modifier = Modifier.weight(0.7f),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (prestamo.estado == "Prestado") {
-                                            MaterialTheme.colorScheme.errorContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        }
-                                    )
-                                ) {
-                                    Text(
-                                        text = if (prestamo.estado == "Prestado") "⏳ ${prestamo.estado}" else "✅ ${prestamo.estado}",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (prestamo.estado == "Prestado") {
-                                            MaterialTheme.colorScheme.onErrorContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
-                                        }
-                                    )
-                                }
-                                Text(
-                                    text = prestamo.fechaPrestamo,
-                                    modifier = Modifier.weight(0.8f),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(prestamos) { prestamo ->
+                            LibrarianPrestamoCard(prestamo = prestamo)
                         }
                     }
                 }
@@ -309,6 +302,137 @@ fun DashboardScreen(
                     isSelected = false,
                     onClick = onNavigateToUsers
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun LibrarianPrestamoCard(prestamo: PrestamoResponse) {
+    val isPrestado = prestamo.fechaDevolucion == null
+    
+    // Función auxiliar para formatear fechas
+    fun formatDate(dateString: String?): String {
+        if (dateString == null) return "N/A"
+        return try {
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+            val outputFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val date = inputFormat.parse(dateString)
+            outputFormat.format(date ?: Date())
+        } catch (e: Exception) {
+            dateString
+        }
+    }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPrestado) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
+            } else {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp, 24.dp, 24.dp, 32.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = prestamo.libro.firstOrNull()?.titulo ?: "Libro no disponible",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${prestamo.user.firstName} ${prestamo.user.lastName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isPrestado) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer
+                        }
+                    )
+                ) {
+                    Text(
+                        text = if (isPrestado) "⏳ Prestado" else "✅ Devuelto",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPrestado) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Fecha de préstamo",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatDate(prestamo.fechaPrestamo),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                
+                Column {
+                    Text(
+                        text = "Fecha límite",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatDate(prestamo.fechaDevolucionEsperada),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            
+            if (!isPrestado) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Fecha de devolución",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatDate(prestamo.fechaDevolucion),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

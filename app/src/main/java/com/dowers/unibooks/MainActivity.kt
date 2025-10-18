@@ -23,6 +23,7 @@ import com.dowers.unibooks.ui.screens.UsersScreen
 import com.dowers.unibooks.ui.screens.StudentDashboardScreen
 import com.dowers.unibooks.ui.screens.StudentBooksScreen
 import com.dowers.unibooks.ui.screens.StudentLoansScreen
+import com.dowers.unibooks.ui.screens.LibrarianLoansScreen
 import com.dowers.unibooks.ui.theme.UnibooksTheme
 import com.dowers.unibooks.utils.UserInfo
 import retrofit2.Retrofit
@@ -76,6 +77,8 @@ fun AppContent(api: AuthApi) {
                 composable("dashboard") {
                     DashboardScreen(
                         userInfo = currentUser!!,
+                        api = api,
+                        accessToken = accessToken,
                         onLogout = {
                             currentUser = null
                             navController.popBackStack("dashboard", inclusive = false)
@@ -87,7 +90,7 @@ fun AppContent(api: AuthApi) {
                             navController.navigate("books")
                         },
                         onNavigateToLoans = {
-                            println("Navegar a préstamos")
+                            navController.navigate("librarian_loans")
                         },
                         onNavigateToUsers = {
                             navController.navigate("users")
@@ -112,7 +115,7 @@ fun AppContent(api: AuthApi) {
                             }
                         },
                         onNavigateToLoans = {
-                            println("Navegar a préstamos")
+                            navController.navigate("librarian_loans")
                         },
                         onNavigateToUsers = {
                             navController.navigate("users")
@@ -140,7 +143,32 @@ fun AppContent(api: AuthApi) {
                             navController.navigate("books")
                         },
                         onNavigateToLoans = {
-                            println("Navegar a préstamos")
+                            navController.navigate("librarian_loans")
+                        }
+                    )
+                }
+                composable("librarian_loans") {
+                    LibrarianLoansScreen(
+                        userInfo = currentUser!!,
+                        api = api,
+                        accessToken = accessToken,
+                        onLogout = {
+                            currentUser = null
+                            navController.popBackStack("dashboard", inclusive = false)
+                        },
+                        onShowProfile = {
+                            println("Mostrar perfil de: ${currentUser!!.name}")
+                        },
+                        onNavigateToHome = {
+                            navController.navigate("dashboard") {
+                                popUpTo("dashboard") { inclusive = false }
+                            }
+                        },
+                        onNavigateToBooks = {
+                            navController.navigate("books")
+                        },
+                        onNavigateToUsers = {
+                            navController.navigate("users")
                         }
                     )
                 }
@@ -154,6 +182,8 @@ fun AppContent(api: AuthApi) {
                 composable("student_dashboard") {
                     StudentDashboardScreen(
                         userInfo = currentUser!!,
+                        api = api,
+                        accessToken = accessToken,
                         onLogout = {
                             currentUser = null
                             navController.popBackStack("student_dashboard", inclusive = false)
@@ -194,6 +224,8 @@ fun AppContent(api: AuthApi) {
                 composable("student_loans") {
                     StudentLoansScreen(
                         userInfo = currentUser!!,
+                        api = api,
+                        accessToken = accessToken,
                         onLogout = {
                             currentUser = null
                             navController.popBackStack("student_dashboard", inclusive = false)
